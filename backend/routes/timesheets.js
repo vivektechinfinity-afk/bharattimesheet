@@ -9,14 +9,30 @@ const ocr = require('../services/ocr.service');
 
 const router = express.Router();
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+// On serverless hosts (Vercel/Lambda) the bundle is read-only and only /tmp is writable,
+// so default there instead of a path inside the deployment.
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const UPLOAD_DIR =
+  process.env.UPLOAD_DIR || (IS_SERVERLESS ? '/tmp/uploads' : path.join(__dirname, '..', 'uploads'));
+
+// Created on first use rather than at import time — a read-only FS would otherwise
+// crash the whole function on cold start, before any request is handled.
+let uploadDirReady = false;
+function ensureUploadDir() {
+  if (!uploadDirReady) {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    uploadDirReady = true;
+  }
+}
 
 const ALLOWED_EXT = ['.pdf', '.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.xlsx', '.xls', '.csv'];
 
 const upload = multer({
   storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+    destination: (req, file, cb) => {
+      try { ensureUploadDir(); cb(null, UPLOAD_DIR); }
+      catch (err) { cb(err); }
+    },
     filename: (req, file, cb) => {
       const safe = path.basename(file.originalname).replace(/[^\w.\-]/g, '_');
       cb(null, `${Date.now()}-${Math.round(Math.random() * 1e6)}-${safe}`);

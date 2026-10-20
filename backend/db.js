@@ -54,12 +54,21 @@ if (hasRealPg) {
   let chain = Promise.resolve();
 
   const getDb = () => {
-    dbPromise ??= import('@electric-sql/pglite').then(async ({ PGlite }) => {
-      const db = new PGlite(dataDir);
-      await db.waitReady;
-      console.log(`✓ PGlite (embedded Postgres) ready — data in ${dataDir}`);
-      return db;
-    });
+    dbPromise ??= import('@electric-sql/pglite')
+      .catch(() => {
+        // PGlite is a devDependency — absent in a production install.
+        throw new Error(
+          'No DATABASE_URL set and PGlite is not installed. ' +
+          'Set DATABASE_URL to a Postgres connection string, or run `npm install` ' +
+          '(without --production) to get the local-dev fallback.'
+        );
+      })
+      .then(async ({ PGlite }) => {
+        const db = new PGlite(dataDir);
+        await db.waitReady;
+        console.log(`✓ PGlite (embedded Postgres) ready — data in ${dataDir}`);
+        return db;
+      });
     return dbPromise;
   };
 

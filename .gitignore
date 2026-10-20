@@ -15,3 +15,6 @@ coverage/
 
 # PGlite local-dev database
 backend/.pgdata/
+
+# Vercel env template (fill and import, never commit filled)
+.env.vercel
